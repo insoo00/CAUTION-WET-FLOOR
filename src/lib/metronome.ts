@@ -1,0 +1,58 @@
+/**
+ * 메트로놈/박자 클릭 사운드. Web Audio API의 oscillator를 짧게 울려서 click을 만든다.
+ * AudioContext는 사용자 제스처 후에야 깨어나므로 ensureAudio()는 click/play 시점에 호출.
+ */
+
+let audioCtx: AudioContext | null = null;
+
+export function getAudioContext(): AudioContext | null {
+  return audioCtx;
+}
+
+export function ensureAudio(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  if (!audioCtx) {
+    const AudioCtor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioCtor) return null;
+    audioCtx = new AudioCtor();
+  }
+  if (audioCtx.state === 'suspended') {
+    void audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+/** 지정한 AudioContext 시각에 클릭을 예약 재생 (정밀 메트로놈용). */
+export function playClickAt(when: number, accent: boolean): void {
+  const ctx = audioCtx;
+  if (!ctx) return;
+  const time = Math.max(ctx.currentTime, when);
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.frequency.value = accent ? 1500 : 900;
+  gain.gain.setValueAtTime(accent ? 0.4 : 0.2, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(time);
+  osc.stop(time + 0.06);
+}
+
+export function playClick(accent: boolean): void {
+  const ctx = audioCtx;
+  if (!ctx) return;
+  playClickAt(ctx.currentTime, accent);
+}
+
+/**
+ * 리듬 패턴(예: "1234", "Abc abc Ab")에서 인덱스의 글자가 강박인지 판단.
+ * 대문자 + 영숫자 = 강박, 소문자/기호 = 약박.
+ */
+export function isAccentBeat(globalBeatIdx: number, pattern: string): boolean {
+  if (!pattern.length) return false;
+  const i = ((globalBeatIdx % pattern.length) + pattern.length) % pattern.length;
+  const ch = pattern[i]!;
+  return ch === ch.toUpperCase() && /[A-Z0-9]/.test(ch);
+}

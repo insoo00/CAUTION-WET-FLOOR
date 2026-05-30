@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Editor / OS
+.DS_Store
+*.local
+
+# Logs
+npm-debug.log*
+
+# Agent / local
+.claude/
+.venv*/
+
+# Temp test/screenshot artifacts
+_*.png
+_*.out
+_*.json
+shot*.py
+*_smoke*.py
+probe_*.py
+
+# MuseScore working/backup/heavy source files (keep .mxl + .mscz)
+score/**/.mscbackup/
+score/**/*.omr
+score/**/*.pdf
+score/**/*.autosave

@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>BandStand v2 · YouTube Sync</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.7/build/opensheetmusicdisplay.min.js"></script>
+<style>
+:root{
+  --ink:#1a1612;
+  --paper:#f5efe4;
+  --paper-2:#ebe2d0;
+  --accent:#d4452a;
+  --accent-soft:#e8a698;
+  --gold:#b8893b;
+  --green:#3d6b4a;
+  --blue:#3b6e8f;
+  --shadow: 0 1px 0 rgba(26,22,18,.08), 0 12px 30px -12px rgba(26,22,18,.25);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{
+  font-family:'Fraunces', Georgia, serif;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, #f3e4c6 0%, transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, #f0d8c6 0%, transparent 55%),
+    var(--paper);
+  color:var(--ink);
+  overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+body::before{
+  content:"";
+  position:fixed;inset:0;pointer-events:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence baseFrequency='0.9' numOctaves='2' seed='4'/><feColorMatrix values='0 0 0 0 0.1  0 0 0 0 0.08  0 0 0 0 0.06  0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  opacity:.4;mix-blend-mode:multiply;z-index:1;
+}
+.app{
+  height:100vh;height:100dvh;
+  display:grid;
+  grid-template-rows:auto 1fr auto;
+  position:relative;z-index:2;
+}
+
+/* ===== HEADER ===== */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 22px;
+  border-bottom:1px solid rgba(26,22,18,.12);
+  background:linear-gradient(180deg, rgba(245,239,228,.95), rgba(245,239,228,.7));
+  backdrop-filter:blur(8px);
+}
+.brand{display:flex;align-items:baseline;gap:10px;}
+.brand h1{
+  font-family:'Fraunces',serif;
+  font-weight:800;font-size:24px;letter-spacing:-.02em;font-style:italic;
+}
+.brand .sub{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+  color:rgba(26,22,18,.55);
+}
+.song-meta{
+  display:flex;align-items:center;gap:14px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  color:rgba(26,22,18,.65);
+}
+.song-meta .pill{
+  padding:5px 10px;border:1px solid rgba(26,22,18,.2);border-radius:999px;
+  background:rgba(255,255,255,.4);
+}
+.song-meta .pill strong{color:var(--ink);font-weight:600;}
+.song-meta .pill.sync-on{background:rgba(61,107,74,.12);border-color:var(--green);}
+.song-meta .pill.sync-on strong{color:var(--green);}
+
+/* ===== MAIN ===== */
+main{
+  display:grid;
+  grid-template-columns: 1fr 340px;
+  gap:16px;
+  padding:16px 22px;
+  overflow:hidden;
+}
+
+.score-wrap{
+  position:relative;
+  background:#fffdf8;
+  border:1px solid rgba(26,22,18,.12);
+  border-radius:14px;
+  box-shadow: var(--shadow);
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.score-wrap::before{
+  content:"";position:absolute;inset:0;
+  background:
+    linear-gradient(180deg, rgba(255,253,248,1) 0%, rgba(255,253,248,0) 6%, rgba(255,253,248,0) 94%, rgba(255,253,248,1) 100%);
+  pointer-events:none;z-index:3;
+}
+.score-header{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 18px;border-bottom:1px dashed rgba(26,22,18,.18);
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  letter-spacing:.15em;text-transform:uppercase;color:rgba(26,22,18,.55);
+}
+.score-header .marker{display:flex;gap:8px;align-items:center;}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(212,69,42,.18);}
+.score-scroll{
+  flex:1;overflow-y:auto;overflow-x:hidden;
+  padding:20px 24px;
+  scroll-behavior:smooth;
+}
+.score-scroll::-webkit-scrollbar{width:6px;}
+.score-scroll::-webkit-scrollbar-thumb{background:rgba(26,22,18,.2);border-radius:3px;}
+#osmdContainer{width:100%;}
+
+.placeholder{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;text-align:center;padding:40px;gap:16px;
+}
+.placeholder svg{width:56px;height:56px;opacity:.4;}
+.placeholder h3{font-size:20px;font-weight:600;font-style:italic;}
+.placeholder p{font-size:13px;color:rgba(26,22,18,.6);max-width:380px;line-height:1.55;}
+.placeholder .btn-load{
+  margin-top:6px;
+  padding:10px 22px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);
+  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  border-radius:999px;cursor:pointer;transition:transform .15s;
+}
+.placeholder .btn-load:hover{transform:translateY(-1px);}
+
+/* ===== SIDEBAR ===== */
+.sidebar{
+  display:flex;flex-direction:column;gap:12px;
+  overflow-y:auto;
+  padding-right:2px;
+}
+.sidebar::-webkit-scrollbar{width:4px;}
+.sidebar::-webkit-scrollbar-thumb{background:rgba(26,22,18,.15);border-radius:2px;}
+.card{
+  background:#fffdf8;border:1px solid rgba(26,22,18,.12);
+  border-radius:12px;padding:14px;box-shadow:var(--shadow);
+}
+.card h2{
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.2em;
+  text-transform:uppercase;color:rgba(26,22,18,.55);margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;justify-content:space-between;
+}
+.card h2 .title-left{display:flex;align-items:center;gap:8px;}
+.card h2 .title-left::before{content:"";width:6px;height:6px;background:var(--accent);border-radius:50%;}
+.card h2 .badge{
+  padding:2px 8px;border-radius:999px;background:var(--ink);color:var(--paper);
+  font-size:9px;letter-spacing:.1em;
+}
+.card h2 .badge.green{background:var(--green);}
+
+/* YouTube embed */
+#ytPlayerBox{
+  position:relative;
+  aspect-ratio:16/9;
+  border-radius:8px;overflow:hidden;background:#000;margin-bottom:10px;
+}
+#ytPlayer{width:100%;height:100%;}
+.yt-input{
+  display:flex;gap:6px;
+}
+.yt-input input{
+  flex:1;padding:8px 10px;border:1px solid rgba(26,22,18,.2);border-radius:8px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--paper);
+  color:var(--ink);
+}
+.yt-input input:focus{outline:none;border-color:var(--accent);}
+.yt-input button{
+  padding:8px 12px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;
+  border-radius:8px;cursor:pointer;text-transform:uppercase;
+}
+
+/* tempo */
+.tempo-row{display:flex;align-items:baseline;gap:10px;}
+.tempo-num{font-size:42px;font-weight:800;font-style:italic;line-height:1;letter-spacing:-.04em;}
+.tempo-unit{font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(26,22,18,.55);letter-spacing:.1em;}
+.tempo-controls{display:flex;gap:6px;margin-top:10px;}
+.tempo-controls button{
+  flex:1;padding:6px;border:1px solid rgba(26,22,18,.2);background:transparent;
+  font-family:'JetBrains Mono',monospace;font-size:11px;border-radius:6px;cursor:pointer;
+  transition:all .15s;
+}
+.tempo-controls button:hover{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+
+/* sync mapping */
+.sync-status{
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  color:rgba(26,22,18,.6);margin-bottom:10px;line-height:1.5;
+}
+.mapping-table{
+  max-height:140px;overflow-y:auto;margin-bottom:10px;
+  border:1px dashed rgba(26,22,18,.15);border-radius:6px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+}
+.mapping-table::-webkit-scrollbar{width:4px;}
+.mapping-table::-webkit-scrollbar-thumb{background:rgba(26,22,18,.15);}
+.mapping-empty{padding:14px;text-align:center;color:rgba(26,22,18,.4);font-size:10px;}
+.mapping-row{
+  display:grid;grid-template-columns:50px 1fr 24px;
+  padding:6px 10px;border-bottom:1px dashed rgba(26,22,18,.08);
+  align-items:center;
+}
+.mapping-row:last-child{border-bottom:none;}
+.mapping-row .m-num{color:var(--accent);font-weight:600;}
+.mapping-row .m-time{color:rgba(26,22,18,.7);}
+.mapping-row .m-del{
+  background:none;border:none;cursor:pointer;color:rgba(26,22,18,.4);font-size:14px;
+}
+.mapping-row .m-del:hover{color:var(--accent);}
+.tap-controls{display:flex;gap:6px;align-items:center;}
+.tap-controls input{
+  width:56px;padding:7px;border:1px solid rgba(26,22,18,.2);border-radius:6px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;text-align:center;
+  background:var(--paper);color:var(--ink);
+}
+.tap-controls input:focus{outline:none;border-color:var(--accent);}
+.tap-btn{
+  flex:1;padding:9px;border:1px solid var(--accent);background:var(--accent);color:#fff;
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;
+  border-radius:6px;cursor:pointer;text-transform:uppercase;font-weight:600;
+  transition:transform .1s;
+}
+.tap-btn:hover{transform:translateY(-1px);}
+.tap-btn:active{transform:translateY(0);}
+.hint{
+  font-family:'JetBrains Mono',monospace;font-size:9px;
+  color:rgba(26,22,18,.5);margin-top:6px;letter-spacing:.05em;line-height:1.5;
+}
+
+/* rhythm */
+.rhythm-pattern{display:flex;gap:5px;margin-bottom:10px;}
+.beat{
+  flex:1;aspect-ratio:1;border-radius:50%;
+  background:rgba(26,22,18,.08);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;
+  color:rgba(26,22,18,.4);
+  transition:all .1s ease-out;
+}
+.beat.accent{background:rgba(212,69,42,.1);color:var(--accent);}
+.beat.active{
+  background:var(--accent);color:#fff;
+  transform:scale(1.18);
+  box-shadow:0 0 0 5px rgba(212,69,42,.2);
+}
+.beat.active.accent{
+  background:var(--ink);
+  box-shadow:0 0 0 5px rgba(26,22,18,.18);
+}
+.rhythm-input input{
+  width:100%;padding:7px 10px;border:1px solid rgba(26,22,18,.2);
+  border-radius:6px;background:var(--paper);
+  font-family:'JetBrains Mono',monospace;font-size:12px;
+  letter-spacing:.1em;text-align:center;color:var(--ink);
+}
+.rhythm-input input:focus{outline:none;border-color:var(--accent);}
+
+/* measure info */
+.measure-info{
+  display:flex;justify-content:space-between;
+  padding-top:8px;
+}
+.measure-info > div{text-align:center;flex:1;}
+.measure-info .label{
+  font-family:'JetBrains Mono',monospace;font-size:9px;
+  letter-spacing:.18em;text-transform:uppercase;
+  color:rgba(26,22,18,.5);margin-bottom:4px;
+}
+.measure-info .value{font-size:22px;font-weight:600;font-style:italic;}
+
+/* ===== FOOTER ===== */
+footer{
+  display:flex;align-items:center;gap:16px;
+  padding:12px 22px;
+  border-top:1px solid rgba(26,22,18,.12);
+  background:linear-gradient(0deg, rgba(245,239,228,.95), rgba(245,239,228,.7));
+  backdrop-filter:blur(8px);
+}
+.play-btn{
+  width:52px;height:52px;border-radius:50%;
+  background:var(--ink);color:var(--paper);
+  display:flex;align-items:center;justify-content:center;
+  border:none;cursor:pointer;
+  box-shadow:0 4px 14px rgba(26,22,18,.3);
+  transition:transform .15s, background .2s;
+}
+.play-btn:hover{transform:scale(1.05);}
+.play-btn.playing{background:var(--accent);}
+.play-btn svg{width:22px;height:22px;}
+.transport-info{flex:1;}
+.transport-info .song-title{
+  font-size:17px;font-weight:600;font-style:italic;margin-bottom:2px;
+}
+.transport-info .time{
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  color:rgba(26,22,18,.55);letter-spacing:.05em;
+}
+.transport-actions{display:flex;gap:6px;}
+.icon-btn{
+  width:38px;height:38px;border-radius:50%;
+  border:1px solid rgba(26,22,18,.2);background:transparent;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:var(--ink);transition:all .15s;
+}
+.icon-btn:hover{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+.icon-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.icon-btn svg{width:16px;height:16px;}
+
+#osmdContainer svg{display:block;margin:0 auto;}
+
+.status{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  background:var(--ink);color:var(--paper);
+  padding:10px 20px;border-radius:999px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  letter-spacing:.1em;text-transform:uppercase;
+  opacity:0;transition:opacity .3s;z-index:100;pointer-events:none;
+}
+.status.show{opacity:1;}
+
+input[type=file]{display:none;}
+
+@media (max-width: 900px){
+  main{grid-template-columns:1fr;grid-template-rows:1fr auto;}
+  .sidebar{flex-direction:row;overflow-x:auto;}
+  .card{min-width:280px;}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="brand">
+      <h1>BandStand</h1>
+      <span class="sub">v2 · YouTube Sync</span>
+    </div>
+    <div class="song-meta">
+      <span class="pill"><strong id="metaTime">4/4</strong> · time</span>
+      <span class="pill"><strong id="metaBpm">120</strong> · bpm</span>
+      <span class="pill" id="syncPill"><strong id="syncMode">BPM</strong> · sync mode</span>
+    </div>
+  </header>
+
+  <main>
+
+    <div class="score-wrap">
+      <div class="score-header">
+        <div class="marker"><span class="dot"></span><span>Now playing — measure <strong id="curMeasure" style="color:var(--ink);font-weight:600;">—</strong></span></div>
+        <div>Auto-scroll <strong id="scrollState" style="color:var(--green);font-weight:600;">ON</strong></div>
+      </div>
+      <div class="score-scroll" id="scoreScroll">
+        <div id="osmdContainer"></div>
+        <div class="placeholder" id="placeholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+            <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+          </svg>
+          <h3>악보를 불러와 시작하세요</h3>
+          <p>MusicXML 업로드 또는 데모 곡으로 바로 시작.<br/>오른쪽 패널에서 YouTube 원곡을 동기화하면<br/>실제 곡 재생에 맞춰 악보가 흐릅니다.</p>
+          <button class="btn-load" onclick="document.getElementById('fileInput').click()">MusicXML 업로드</button>
+          <button class="btn-load" style="background:transparent;color:var(--ink);" onclick="loadDemo()">데모 곡으로 보기</button>
+          <input type="file" id="fileInput" accept=".xml,.musicxml,.mxl" />
+        </div>
+      </div>
+    </div>
+
+    <aside class="sidebar">
+
+      <!-- YouTube Source -->
+      <div class="card">
+        <h2><span class="title-left">Audio Source · YouTube</span><span class="badge" id="ytStatus">대기</span></h2>
+        <div id="ytPlayerBox"><div id="ytPlayer"></div></div>
+        <div class="yt-input">
+          <input id="ytUrl" placeholder="YouTube URL 또는 비디오 ID" value="Ik9hLZsHU7g" />
+          <button onclick="loadYouTube()">Load</button>
+        </div>
+        <div class="hint">유튜브 영상을 불러오면 그 재생 시간에 맞춰 악보가 따라갑니다.</div>
+      </div>
+
+      <!-- Measure ↔ Time Mapping -->
+      <div class="card">
+        <h2><span class="title-left">Measure Sync</span><span class="badge green" id="mapBadge">0 points</span></h2>
+        <div class="sync-status" id="syncStatusText">
+          YouTube를 재생하면서 각 마디 시작점에 도달할 때마다<br/>
+          아래 <strong>"📍 현재 시간 = 이 마디"</strong> 버튼을 누르세요.<br/>
+          2개 이상 찍으면 정밀 동기화 모드로 자동 전환됩니다.
+        </div>
+        <div class="mapping-table" id="mappingTable">
+          <div class="mapping-empty">아직 매핑이 없습니다</div>
+        </div>
+        <div class="tap-controls">
+          <input type="number" id="tapMeasure" min="1" value="1" />
+          <button class="tap-btn" onclick="tapMeasure()">📍 현재 시간 = 이 마디</button>
+        </div>
+        <div class="hint">
+          예) 1마디(인트로 시작), 9마디(절 시작), 17마디(후렴 시작) 등<br/>
+          전형적으로 5~6개 포인트면 곡 전체가 정확히 따라갑니다.
+        </div>
+      </div>
+
+      <!-- Tempo (BPM fallback) -->
+      <div class="card">
+        <h2><span class="title-left">Tempo (BPM fallback)</span></h2>
+        <div class="tempo-row">
+          <span class="tempo-num" id="tempoDisplay">120</span>
+          <span class="tempo-unit">BPM</span>
+        </div>
+        <div class="tempo-controls">
+          <button onclick="changeTempo(-5)">−5</button>
+          <button onclick="changeTempo(-1)">−1</button>
+          <button onclick="changeTempo(1)">+1</button>
+          <button onclick="changeTempo(5)">+5</button>
+        </div>
+        <div class="hint">YouTube 매핑이 없을 때만 사용</div>
+      </div>
+
+      <!-- Rhythm -->
+      <div class="card">
+        <h2><span class="title-left">Rhythm Pattern</span></h2>
+        <div class="rhythm-pattern" id="rhythmPattern"></div>
+        <div class="rhythm-input">
+          <input type="text" id="rhythmInput" value="1234" maxlength="16"
+                 onchange="setRhythm(this.value)" />
+        </div>
+        <div class="hint">대문자=강박, 소문자=약박 / 예) 1234, 123 123 12</div>
+      </div>
+
+      <!-- Progress -->
+      <div class="card">
+        <h2><span class="title-left">Position</span></h2>
+        <div class="measure-info">
+          <div>
+            <div class="label">Measure</div>
+            <div class="value" id="measureCurrent">—</div>
+          </div>
+          <div>
+            <div class="label">Total</div>
+            <div class="value" id="measureTotal">—</div>
+          </div>
+          <div>
+            <div class="label">Beat</div>
+            <div class="value" id="beatCurrent">—</div>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+  </main>
+
+  <footer>
+    <button class="play-btn" id="playBtn" onclick="togglePlay()">
+      <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <div class="transport-info">
+      <div class="song-title" id="songTitle">악보를 불러오세요</div>
+      <div class="time"><span id="footTime">0:00 / 0:00</span></div>
+    </div>
+    <div class="transport-actions">
+      <button class="icon-btn" onclick="rewind()" title="처음으로">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+      </button>
+      <button class="icon-btn" id="metroBtn" onclick="toggleMetronome()" title="메트로놈">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l5 18H7zM10 12l4-2"/></svg>
+      </button>
+      <button class="icon-btn active" id="scrollBtn" onclick="toggleScroll()" title="자동 스크롤">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14m-5-5l5 5 5-5M7 10l5-5 5 5"/></svg>
+      </button>
+      <button class="icon-btn" onclick="exportMapping()" title="매핑 내보내기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      </button>
+    </div>
+  </footer>
+
+  <div class="status" id="status"></div>
+</div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+/* ===========================================================
+ * BandStand v2 — with YouTube sync + measure mapping
+ * =========================================================== */
+
+let osmd = null;
+let isPlaying = false;
+let bpm = 120;
+let beatsPerMeasure = 4;
+let currentMeasure = 0;
+let currentBeat = 0;
+let totalMeasures = 0;
+let rafId = null;
+let lastCursorMeasure = -1;
+
+// rhythm
+let rhythmPattern = "1234";
+
+// flags
+let metronomeOn = false;
+let autoScroll = true;
+
+// audio
+let audioCtx = null;
+let lastBeatTime = 0;
+let beatCounter = 0;
+
+// YouTube
+let ytPlayer = null;
+let ytReady = false;
+let ytVideoId = 'Ik9hLZsHU7g';
+
+// Measure mapping: [{measure: 1, time: 0.0}, {measure: 9, time: 12.4}, ...]
+let measureMap = JSON.parse(localStorage.getItem('bandstand_map_'+ytVideoId) || '[]');
+
+/* ---------- AUDIO ---------- */
+function ensureAudio(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playClick(accent){
+  if(!audioCtx) return;
+  const time = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.frequency.value = accent ? 1500 : 900;
+  gain.gain.setValueAtTime(accent ? 0.4 : 0.2, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(time);
+  osc.stop(time + 0.06);
+}
+
+function isAccentBeat(idx){
+  const i = idx % rhythmPattern.length;
+  const ch = rhythmPattern[i];
+  return ch === ch.toUpperCase() && /[A-Z0-9]/.test(ch);
+}
+
+/* ---------- YOUTUBE ---------- */
+function onYouTubeIframeAPIReady(){
+  createYTPlayer(ytVideoId);
+}
+
+function createYTPlayer(videoId){
+  ytPlayer = new YT.Player('ytPlayer', {
+    videoId: videoId,
+    playerVars: { 'playsinline': 1, 'controls': 1, 'modestbranding':1, 'rel':0 },
+    events: {
+      'onReady': () => {
+        ytReady = true;
+        document.getElementById('ytStatus').textContent = 'Ready';
+        document.getElementById('ytStatus').classList.add('green');
+        updateSyncMode();
+      },
+      'onStateChange': (e) => {
+        if(e.data === YT.PlayerState.PLAYING){
+          if(!isPlaying) togglePlay();
+        }else if(e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED){
+          if(isPlaying) togglePlay();
+        }
+      }
+    }
+  });
+}
+
+function loadYouTube(){
+  const input = document.getElementById('ytUrl').value.trim();
+  if(!input) return;
+  // extract video id
+  let id = input;
+  const m = input.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/);
+  if(m) id = m[1];
+  if(!/^[a-zA-Z0-9_-]{11}$/.test(id)){
+    showStatus('✗ 유효하지 않은 URL');
+    return;
+  }
+  ytVideoId = id;
+  // load saved mapping for this video
+  measureMap = JSON.parse(localStorage.getItem('bandstand_map_'+ytVideoId) || '[]');
+  renderMapping();
+  if(ytPlayer && ytReady){
+    ytPlayer.loadVideoById(id);
+    ytPlayer.pauseVideo();
+  }
+  showStatus('✓ YouTube 로드: ' + id);
+}
+
+/* ---------- MEASURE MAPPING ---------- */
+function tapMeasure(){
+  if(!ytPlayer || !ytReady){
+    showStatus('✗ YouTube를 먼저 불러오세요');
+    return;
+  }
+  const measure = parseInt(document.getElementById('tapMeasure').value);
+  const time = ytPlayer.getCurrentTime();
+  if(!measure || measure < 1) return;
+
+  // replace if same measure already exists
+  measureMap = measureMap.filter(p => p.measure !== measure);
+  measureMap.push({measure, time: parseFloat(time.toFixed(3))});
+  measureMap.sort((a,b)=>a.measure - b.measure);
+  saveMapping();
+  renderMapping();
+  // auto-increment measure number for next tap (commonly 4 or 8 measures ahead)
+  document.getElementById('tapMeasure').value = measure + 8;
+  showStatus('📍 m.' + measure + ' = ' + time.toFixed(2) + 's');
+  updateSyncMode();
+}
+
+function deleteMappingPoint(measure){
+  measureMap = measureMap.filter(p => p.measure !== measure);
+  saveMapping();
+  renderMapping();
+  updateSyncMode();
+}
+
+function renderMapping(){
+  const table = document.getElementById('mappingTable');
+  document.getElementById('mapBadge').textContent = measureMap.length + ' points';
+  if(measureMap.length === 0){
+    table.innerHTML = '<div class="mapping-empty">아직 매핑이 없습니다</div>';
+    return;
+  }
+  table.innerHTML = measureMap.map(p =>
+    `<div class="mapping-row">
+       <span class="m-num">m.${p.measure}</span>
+       <span class="m-time">${formatTime(p.time)} <span style="opacity:.4">(${p.time.toFixed(2)}s)</span></span>
+       <button class="m-del" onclick="deleteMappingPoint(${p.measure})">×</button>
+     </div>`
+  ).join('');
+}
+
+function saveMapping(){
+  localStorage.setItem('bandstand_map_'+ytVideoId, JSON.stringify(measureMap));
+}
+
+function updateSyncMode(){
+  const usePrecise = measureMap.length >= 2;
+  document.getElementById('syncMode').textContent = usePrecise ? 'YouTube' : 'BPM';
+  document.getElementById('syncPill').classList.toggle('sync-on', usePrecise);
+}
+
+function exportMapping(){
+  if(measureMap.length === 0){
+    showStatus('✗ 내보낼 매핑이 없습니다');
+    return;
+  }
+  const data = {
+    videoId: ytVideoId,
+    bpm: bpm,
+    timeSignature: beatsPerMeasure+'/4',
+    rhythm: rhythmPattern,
+    mapping: measureMap
+  };
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'bandstand-'+ytVideoId+'.json';
+  a.click();
+  showStatus('✓ 매핑 파일 저장');
+}
+
+/* ---------- POSITION COMPUTATION ---------- */
+// Given youtube current time, compute the current measure as a floating point number
+function timeToMeasure(t){
+  if(measureMap.length < 2){
+    // fallback: pure BPM
+    const beats = (t * bpm) / 60;
+    return beats / beatsPerMeasure;
+  }
+  // find segment
+  // if before first point: extrapolate using BPM
+  if(t <= measureMap[0].time){
+    const beatsBefore = ((measureMap[0].time - t) * bpm) / 60;
+    return Math.max(0, measureMap[0].measure - 1 - beatsBefore/beatsPerMeasure);
+  }
+  // if after last point: extrapolate using last segment's rate
+  if(t >= measureMap[measureMap.length-1].time){
+    const last = measureMap[measureMap.length-1];
+    const prev = measureMap[measureMap.length-2];
+    const rate = (last.measure - prev.measure) / (last.time - prev.time); // measures/sec
+    return (last.measure - 1) + (t - last.time) * rate;
+  }
+  // interpolate between two anchor points
+  for(let i=0; i<measureMap.length-1; i++){
+    const a = measureMap[i], b = measureMap[i+1];
+    if(t >= a.time && t <= b.time){
+      const ratio = (t - a.time) / (b.time - a.time);
+      return (a.measure - 1) + ratio * (b.measure - a.measure);
+    }
+  }
+  return 0;
+}
+
+/* ---------- MAIN LOOP (rAF) ---------- */
+function tick(){
+  if(!isPlaying){return;}
+  let measureFloat = 0;
+  let secondsElapsed = 0;
+  let totalSec = 0;
+
+  if(ytPlayer && ytReady){
+    secondsElapsed = ytPlayer.getCurrentTime();
+    totalSec = ytPlayer.getDuration();
+    measureFloat = timeToMeasure(secondsElapsed);
+  }else{
+    // pure BPM mode without youtube — use audioCtx time
+    if(!audioCtx) ensureAudio();
+    if(audioCtx){
+      const elapsed = audioCtx.currentTime - lastBeatTime;
+      const beats = elapsed * bpm / 60;
+      measureFloat = beats / beatsPerMeasure;
+      secondsElapsed = elapsed;
+    }
+  }
+
+  const measureIdx = Math.floor(measureFloat);
+  const beatInMeasureF = (measureFloat - measureIdx) * beatsPerMeasure;
+  const beatIdx = Math.floor(beatInMeasureF);
+
+  currentMeasure = measureIdx;
+  currentBeat = beatIdx;
+
+  // beat counter for metronome / rhythm display
+  const globalBeat = Math.floor(measureFloat * beatsPerMeasure);
+  if(globalBeat !== beatCounter){
+    beatCounter = globalBeat;
+    if(metronomeOn) playClick(isAccentBeat(beatCounter));
+    paintRhythm(beatCounter % rhythmPattern.length);
+  }
+
+  // cursor (only move when measure changes)
+  if(measureIdx !== lastCursorMeasure && osmd && osmd.cursor && measureIdx >= 0 && measureIdx < totalMeasures){
+    moveCursorToMeasure(measureIdx);
+    lastCursorMeasure = measureIdx;
+  }
+
+  // info display
+  document.getElementById('measureCurrent').textContent = Math.max(1, measureIdx + 1);
+  document.getElementById('beatCurrent').textContent = beatIdx + 1;
+  document.getElementById('curMeasure').textContent = Math.max(1, measureIdx + 1);
+
+  document.getElementById('footTime').textContent =
+    formatTime(secondsElapsed) + (totalSec ? ' / ' + formatTime(totalSec) : '');
+
+  if(measureIdx >= totalMeasures && totalMeasures > 0){
+    // reached end — stop
+    togglePlay();
+    return;
+  }
+  rafId = requestAnimationFrame(tick);
+}
+
+function formatTime(s){
+  if(!isFinite(s)) return '0:00';
+  const m = Math.floor(s/60); const sec = Math.floor(s%60);
+  return m + ':' + (sec<10?'0':'') + sec;
+}
+
+/* ---------- Rhythm visual ---------- */
+function renderRhythmPattern(){
+  const container = document.getElementById('rhythmPattern');
+  container.innerHTML = '';
+  for(let i=0;i<rhythmPattern.length;i++){
+    const ch = rhythmPattern[i];
+    const accent = ch === ch.toUpperCase() && /[A-Z0-9]/.test(ch);
+    const div = document.createElement('div');
+    div.className = 'beat' + (accent?' accent':'');
+    div.textContent = ch.toUpperCase();
+    container.appendChild(div);
+  }
+}
+function paintRhythm(activeIdx){
+  document.querySelectorAll('.beat').forEach((el,i)=>{
+    el.classList.toggle('active', i===activeIdx);
+  });
+}
+function setRhythm(val){
+  if(!val) return;
+  rhythmPattern = val.replace(/\s/g,'') || '1234';
+  renderRhythmPattern();
+}
+
+/* ---------- OSMD cursor ---------- */
+function moveCursorToMeasure(measureIdx){
+  if(!osmd || !osmd.cursor) return;
+  try{
+    osmd.cursor.reset();
+    let safety = 0;
+    while(!osmd.cursor.iterator.EndReached && safety < 10000){
+      const curMeas = osmd.cursor.iterator.CurrentMeasureIndex;
+      if(curMeas >= measureIdx) break;
+      osmd.cursor.next();
+      safety++;
+    }
+    osmd.cursor.show();
+
+    if(autoScroll){
+      const cursorEl = osmd.cursor.cursorElement;
+      if(cursorEl){
+        const scrollEl = document.getElementById('scoreScroll');
+        const cRect = cursorEl.getBoundingClientRect();
+        const sRect = scrollEl.getBoundingClientRect();
+        if(cRect.bottom > sRect.bottom - 80 || cRect.top < sRect.top + 20){
+          const targetTop = scrollEl.scrollTop + (cRect.top - sRect.top) - sRect.height/3;
+          scrollEl.scrollTo({top: targetTop, behavior:'smooth'});
+        }
+      }
+    }
+  }catch(e){console.warn('cursor failed', e);}
+}
+
+/* ---------- Transport ---------- */
+function togglePlay(){
+  isPlaying = !isPlaying;
+  const btn = document.getElementById('playBtn');
+  const ico = document.getElementById('playIcon');
+  if(isPlaying){
+    ensureAudio();
+    btn.classList.add('playing');
+    ico.innerHTML = '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+    if(audioCtx) lastBeatTime = audioCtx.currentTime;
+    if(ytPlayer && ytReady && ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING){
+      ytPlayer.playVideo();
+    }
+    beatCounter = -1; // force first beat
+    lastCursorMeasure = -1;
+    rafId = requestAnimationFrame(tick);
+    showStatus('▶ Playing');
+  }else{
+    btn.classList.remove('playing');
+    ico.innerHTML = '<path d="M8 5v14l11-7z"/>';
+    cancelAnimationFrame(rafId);
+    if(ytPlayer && ytReady && ytPlayer.getPlayerState() === YT.PlayerState.PLAYING){
+      ytPlayer.pauseVideo();
+    }
+    showStatus('⏸ Paused');
+  }
+}
+
+function rewind(){
+  if(isPlaying) togglePlay();
+  beatCounter = 0;
+  currentMeasure = 0;
+  lastCursorMeasure = -1;
+  if(osmd && osmd.cursor){osmd.cursor.reset();osmd.cursor.show();}
+  if(ytPlayer && ytReady){ytPlayer.seekTo(0); ytPlayer.pauseVideo();}
+  document.getElementById('measureCurrent').textContent = '1';
+  document.getElementById('beatCurrent').textContent = '1';
+  document.getElementById('curMeasure').textContent = '1';
+  document.getElementById('scoreScroll').scrollTo({top:0,behavior:'smooth'});
+  showStatus('⏮ Rewind');
+}
+
+function toggleMetronome(){
+  metronomeOn = !metronomeOn;
+  document.getElementById('metroBtn').classList.toggle('active', metronomeOn);
+  showStatus(metronomeOn?'🔊 Metronome ON':'🔇 Metronome OFF');
+}
+function toggleScroll(){
+  autoScroll = !autoScroll;
+  document.getElementById('scrollBtn').classList.toggle('active', autoScroll);
+  document.getElementById('scrollState').textContent = autoScroll?'ON':'OFF';
+  document.getElementById('scrollState').style.color = autoScroll?'var(--green)':'var(--accent)';
+}
+function changeTempo(delta){
+  bpm = Math.max(40, Math.min(240, bpm + delta));
+  document.getElementById('tempoDisplay').textContent = bpm;
+  document.getElementById('metaBpm').textContent = bpm;
+}
+
+let statusTimer = null;
+function showStatus(msg){
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(()=>el.classList.remove('show'), 1500);
+}
+
+/* ---------- OSMD load ---------- */
+async function loadMusicXML(xmlString, title){
+  document.getElementById('placeholder').style.display = 'none';
+  if(!osmd){
+    osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay('osmdContainer', {
+      autoResize: true, drawTitle: true, drawSubtitle: true,
+      drawComposer: true, drawCredits: false,
+      pageBackgroundColor: '#FFFDF8', followCursor: false,
+    });
+  }
+  try{
+    await osmd.load(xmlString);
+    await osmd.render();
+    osmd.cursor.show();
+    const sheet = osmd.Sheet;
+    totalMeasures = sheet.SourceMeasures.length;
+    const ts = sheet.SourceMeasures[0].ActiveTimeSignature;
+    if(ts){
+      beatsPerMeasure = ts.Numerator;
+      document.getElementById('metaTime').textContent = ts.Numerator + '/' + ts.Denominator;
+    }
+    try{
+      const t = sheet.DefaultStartTempoInBpm;
+      if(t && t>0){bpm = Math.round(t); document.getElementById('tempoDisplay').textContent = bpm; document.getElementById('metaBpm').textContent = bpm;}
+    }catch(e){}
+    document.getElementById('measureTotal').textContent = totalMeasures;
+    document.getElementById('measureCurrent').textContent = '1';
+    document.getElementById('beatCurrent').textContent = '1';
+    document.getElementById('songTitle').textContent = title || (sheet.TitleString || '제목 없음');
+    showStatus('✓ 악보 로드 · ' + totalMeasures + ' measures');
+  }catch(e){
+    console.error(e);
+    showStatus('✗ 로드 실패');
+    document.getElementById('placeholder').style.display = 'flex';
+  }
+}
+
+document.getElementById('fileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const name = file.name.replace(/\.[^.]+$/,'');
+  if(file.name.toLowerCase().endsWith('.mxl')){
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let bin = '';
+    for(let i=0;i<bytes.byteLength;i++) bin += String.fromCharCode(bytes[i]);
+    await loadMusicXML(bin, name);
+  }else{
+    const txt = await file.text();
+    await loadMusicXML(txt, name);
+  }
+});
+
+/* ---------- DEMO ---------- */
+function loadDemo(){
+  const demoXML = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="4.0">
+  <work><work-title>Practice Demo</work-title></work>
+  <part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+  <part id="P1">${generateMeasures()}</part>
+</score-partwise>`;
+  loadMusicXML(demoXML, 'Practice Demo');
+}
+
+function generateMeasures(){
+  const patterns = [
+    ['C','E','G','E'], ['F','A','C5','A'], ['G','B','D5','B'], ['C','E','G','C5'],
+    ['C','E','G','E'], ['F','A','C5','A'], ['G','D5','B','G'], ['C','G','E','C'],
+    ['A','C5','E5','C5'], ['F','A','D5','A'], ['G','B','D5','G'], ['C','E','G','C5'],
+    ['E','G','C5','G'], ['F','A','C5','A'], ['G','B','D5','B'], ['C','E','G','C5'],
+    ['C','E','G','E'], ['F','A','C5','A'], ['G','B','D5','B'], ['C','E','G','C5'],
+    ['C','E','G','E'], ['F','A','C5','A'], ['G','D5','B','G'], ['C','G','E','C']
+  ];
+  const measures = [];
+  for(let m=0;m<patterns.length;m++){
+    let attrs = '';
+    if(m===0){
+      attrs = `<attributes>
+        <divisions>4</divisions>
+        <key><fifths>0</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef>
+      </attributes>
+      <direction placement="above">
+        <direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>120</per-minute></metronome></direction-type>
+        <sound tempo="120"/>
+      </direction>`;
+    }
+    let notes = '';
+    for(const n of patterns[m]){
+      const step = n[0];
+      const octave = n.length>1 && /\d/.test(n[n.length-1]) ? n[n.length-1] : '4';
+      notes += `<note><pitch><step>${step}</step><octave>${octave}</octave></pitch><duration>4</duration><type>quarter</type></note>`;
+    }
+    measures.push(`<measure number="${m+1}">${attrs}${notes}</measure>`);
+  }
+  return measures.join('\n');
+}
+
+/* ---------- Init ---------- */
+renderRhythmPattern();
+renderMapping();
+document.getElementById('tempoDisplay').textContent = bpm;
+
+document.addEventListener('keydown', (e)=>{
+  if(e.target.tagName === 'INPUT') return;
+  if(e.code === 'Space'){e.preventDefault();togglePlay();}
+  if(e.key === 'r' || e.key === 'R') rewind();
+  if(e.key === 'm' || e.key === 'M') toggleMetronome();
+  if(e.key === 't' || e.key === 'T') tapMeasure();
+});
+</script>
+</body>
+</html>
