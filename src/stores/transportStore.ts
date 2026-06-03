@@ -33,7 +33,7 @@ export const useTransportStore = create<TransportState>((set) => ({
   currentBeat: 0,
   bpm: 120,
   beatsPerMeasure: 4,
-  playbackSource: 'youtube',
+  playbackSource: 'score',
   loopStartMeasure: null,
   loopEndMeasure: null,
 

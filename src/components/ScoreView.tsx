@@ -17,7 +17,7 @@ import {
   type AnnTool,
   type AnnotationHandle,
 } from './AnnotationCanvas';
-import naneunNabiMxlUrl from '../../score/A_Flying_Butterfly/main.mxl?url';
+import { SONGS, type SongDef } from '../lib/songLibrary';
 
 export interface ScoreViewHandle {
   /** 현재 울리는 음표 id들을 하이라이트. 첫 음표의 0-indexed 마디 idx 반환(-1=없음) */
@@ -87,7 +87,11 @@ export function ScoreView({ ref, onSeekTime }: Props) {
         for (const el of highlightedRef.current) el.classList.remove('playing');
         highlightedRef.current = [];
         let firstEl: Element | null = null;
-        for (const id of ids) {
+        for (const rawId of ids) {
+          // 도돌이표(반복) 두 번째 패스의 음표는 Verovio가 `-rend2` 같은
+          // 접미사 ID를 부여한다. 그 ID는 SVG에 없으므로(마디는 한 번만 그려짐)
+          // 접미사를 떼어 원본 요소에 매핑한다. → 반복 구간도 정상 하이라이트.
+          const id = rawId.replace(/-rend\d+$/, '');
           const el = root.querySelector(`g#${CSS.escape(id)}`);
           if (el) {
             el.classList.add('playing');
@@ -297,7 +301,7 @@ export function ScoreView({ ref, onSeekTime }: Props) {
     });
 
     console.log(
-      '[BandStand] Verovio:',
+      '[CautionWetFloor] Verovio:',
       totalMeasures,
       'measures,',
       notes.length,
@@ -344,21 +348,20 @@ export function ScoreView({ ref, onSeekTime }: Props) {
     }
   };
 
-  const handleNaneunNabi = async () => {
+  const loadSongFromLibrary = async (song: SongDef) => {
     try {
       setError(null);
-      const res = await fetch(naneunNabiMxlUrl);
+      const res = await fetch(song.mxlUrl);
       if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
       const buf = await res.arrayBuffer();
-      await loadScore({ mxlBase64: bufToBase64(buf) }, '나는 나비');
-      useYouTubeStore.getState().setYtVideoId('Ik9hLZsHU7g');
-      useMappingStore.getState().setMap([
-        { measure: 1, time: 0 },
-        { measure: 9, time: 13.58 },
-      ]);
+      await loadScore({ mxlBase64: bufToBase64(buf) }, song.title);
+      if (song.youtubeId) useYouTubeStore.getState().setYtVideoId(song.youtubeId);
+      if (song.mapping && song.mapping.length) {
+        useMappingStore.getState().setMap(song.mapping);
+      }
     } catch (e) {
       console.error(e);
-      setError('나는 나비 로드 실패');
+      setError(`${song.title} 로드 실패`);
     }
   };
 
@@ -465,22 +468,47 @@ export function ScoreView({ ref, onSeekTime }: Props) {
             </svg>
             <h3 className="text-xl italic font-semibold">악보를 불러와 시작하세요</h3>
             <p className="text-[13px] text-ink/60 leading-relaxed max-w-sm">
-              MusicXML 업로드 또는 등록된 곡으로 바로 시작. <br />
+              아래 곡 목록에서 고르거나 MusicXML을 업로드하세요. <br />
               악보 음을 피아노로 재생하고, 마디를 클릭하면 그 지점부터 들을 수
               있어요.
             </p>
-            <div className="flex gap-2 mt-2">
-              <button className="ink-btn" onClick={() => fileInputRef.current?.click()}>
-                MusicXML 업로드
-              </button>
-              <button
-                className="ink-btn"
-                style={{ background: 'transparent', color: 'var(--color-ink)' }}
-                onClick={handleNaneunNabi}
-              >
-                나는 나비 보기
-              </button>
+
+            {/* 등록된 곡 목록 — songLibrary.ts 에 항목을 추가하면 자동 확장 */}
+            <div className="w-full max-w-sm mt-2 flex flex-col gap-2">
+              <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink/45 text-left">
+                Song Library · {SONGS.length}
+              </div>
+              {SONGS.map((song) => (
+                <button
+                  key={song.id}
+                  onClick={() => loadSongFromLibrary(song)}
+                  className="group flex items-center justify-between gap-3 w-full px-4 py-3 rounded-xl border border-ink/12 bg-paper-card/70 hover:border-accent/60 hover:bg-paper-card transition-colors text-left"
+                >
+                  <span className="flex flex-col">
+                    <span className="font-display italic font-semibold text-[15px] leading-tight">
+                      {song.title}
+                    </span>
+                    {song.artist && (
+                      <span className="font-mono text-[10px] text-ink/50 mt-0.5">
+                        {song.artist}
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-mono text-[11px] text-ink/35 group-hover:text-accent transition-colors">
+                    {song.youtubeId ? '▶ 동기' : '악보'}
+                  </span>
+                </button>
+              ))}
             </div>
+
+            <div className="flex items-center gap-2 mt-1 w-full max-w-sm">
+              <span className="flex-1 h-px bg-ink/10" />
+              <span className="font-mono text-[10px] text-ink/35">또는</span>
+              <span className="flex-1 h-px bg-ink/10" />
+            </div>
+            <button className="ink-btn" onClick={() => fileInputRef.current?.click()}>
+              MusicXML 업로드
+            </button>
             {error && (
               <p className="font-mono text-[10px] text-accent mt-2">{error}</p>
             )}

@@ -1,6 +1,6 @@
-# BandStand
+# 미끄럼주의 · Caution: Wet Floor
 
-밴드 연습용 악보 + 원곡 동기화 웹앱.
+밴드 "미끄럼주의(CAUTION: WET FLOOR)"의 연습용 악보 + 원곡 동기화 웹앱.
 
 ## 빠른 시작 (프로토타입만 보고 싶다면)
 
