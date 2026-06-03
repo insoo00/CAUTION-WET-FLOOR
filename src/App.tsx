@@ -45,7 +45,12 @@ export function App() {
     const t = useTransportStore.getState();
     const myToken = ++playToken.current;
     const cancelled = () => playToken.current !== myToken;
-    ensureAudio();
+    ensureAudio(); // Web Audio(메트로놈/피아노) 잠금 해제 — 반드시 제스처 안에서
+    // iOS: 첫 재생 시 YouTube 플레이어도 제스처 안에서 깨워둔다(음소거 잠깐 재생).
+    if (t.playbackSource === 'youtube') {
+      await ytRef.current?.prime();
+      if (cancelled()) return;
+    }
     if (t.playbackSource === 'score') {
       setOverlay('악기 불러오는 중…');
       await preloadPiano();

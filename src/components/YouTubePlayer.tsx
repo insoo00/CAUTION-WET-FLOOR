@@ -8,6 +8,13 @@ export interface YouTubeHandle {
   getCurrentTime: () => number | null;
   getDuration: () => number;
   seekTo: (sec: number) => void;
+  /**
+   * iOS 잠금 해제: 사용자 제스처 안에서 음소거로 잠깐 재생 후 즉시 정지.
+   * 이렇게 한 번 "사용자가 시작한 재생"으로 인정받으면, 이후 카운트인 뒤
+   * 프로그램이 호출하는 playVideo()도 소리가 정상적으로 난다.
+   * 첫 호출에만 동작하며, 잠금 해제가 끝나면 resolve.
+   */
+  prime: () => Promise<void>;
 }
 
 interface Props {
@@ -56,6 +63,8 @@ export function YouTubePlayer({ ref }: Props) {
 
   const playerRef = useRef<YT.Player | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const primedRef = useRef(false); // iOS 잠금 해제 완료 여부
+  const primingRef = useRef(false); // 잠금 해제 중 (상태변경 이벤트 무시용)
   const [inputUrl, setInputUrl] = useState(ytVideoId);
 
   useImperativeHandle(
@@ -64,6 +73,35 @@ export function YouTubePlayer({ ref }: Props) {
       getCurrentTime: () => playerRef.current?.getCurrentTime() ?? null,
       getDuration: () => playerRef.current?.getDuration() ?? 0,
       seekTo: (sec: number) => playerRef.current?.seekTo(sec, true),
+      prime: () =>
+        new Promise<void>((resolve) => {
+          const p = playerRef.current;
+          if (!p || !useYouTubeStore.getState().ytReady || primedRef.current) {
+            resolve();
+            return;
+          }
+          primedRef.current = true;
+          primingRef.current = true; // 이 동안의 PLAYING/PAUSED 이벤트는 무시
+          try {
+            p.mute();
+            p.playVideo();
+          } catch {
+            /* ignore */
+          }
+          window.setTimeout(() => {
+            try {
+              p.pauseVideo();
+              p.unMute();
+            } catch {
+              /* ignore */
+            }
+            // pauseVideo의 PAUSED 이벤트가 도착해 흡수될 시간을 두고 해제
+            window.setTimeout(() => {
+              primingRef.current = false;
+              resolve();
+            }, 150);
+          }, 60);
+        }),
     }),
     []
   );
@@ -98,6 +136,8 @@ export function YouTubePlayer({ ref }: Props) {
           events: {
             onReady: () => setYtReady(true),
             onStateChange: (e) => {
+              // iOS 잠금 해제(prime) 중의 재생/정지 이벤트는 무시.
+              if (primingRef.current) return;
               // 악보 재생 모드에선 YouTube 상태로 transport를 건드리지 않는다.
               if (useTransportStore.getState().playbackSource !== 'youtube') return;
               const s = e.data;

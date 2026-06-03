@@ -18,6 +18,17 @@ export function ensureAudio(): AudioContext | null {
         .webkitAudioContext;
     if (!AudioCtor) return null;
     audioCtx = new AudioCtor();
+    // iOS Safari 잠금 해제: 생성 직후(사용자 제스처 안에서) 무음 버퍼를 한 번
+    // 재생해 두면 이후 oscillator/피아노 소리가 정상적으로 난다.
+    try {
+      const buf = audioCtx.createBuffer(1, 1, 22050);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start(0);
+    } catch {
+      /* ignore */
+    }
   }
   if (audioCtx.state === 'suspended') {
     void audioCtx.resume();
