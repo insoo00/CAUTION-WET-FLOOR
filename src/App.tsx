@@ -13,7 +13,12 @@ import { useTransportStore } from './stores/transportStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { useMappingStore } from './stores/mappingStore';
 import { useTransportLoop } from './hooks/useTransportLoop';
-import { ensureAudio, playClick } from './lib/metronome';
+import {
+  ensureAudio,
+  playClick,
+  resumeAudio,
+  unlockAudioOnFirstGesture,
+} from './lib/metronome';
 import { preloadPiano } from './lib/scorePlayer';
 
 const SECTIONS = [
@@ -46,14 +51,12 @@ export function App() {
     const myToken = ++playToken.current;
     const cancelled = () => playToken.current !== myToken;
     ensureAudio(); // Web Audio(메트로놈/피아노) 잠금 해제 — 반드시 제스처 안에서
-    // iOS: 첫 재생 시 YouTube 플레이어도 제스처 안에서 깨워둔다(음소거 잠깐 재생).
-    if (t.playbackSource === 'youtube') {
-      await ytRef.current?.prime();
-      if (cancelled()) return;
-    }
     if (t.playbackSource === 'score') {
       setOverlay('악기 불러오는 중…');
       await preloadPiano();
+      if (cancelled()) return;
+      // 샘플 로딩 후에도 컨텍스트가 'running'인지 확실히 보장(iOS 첫 재생 무음 방지).
+      await resumeAudio();
       if (cancelled()) return;
     }
     const beats = useSettingsStore.getState().countInBeats;
@@ -115,6 +118,11 @@ export function App() {
   };
 
   const getCurrentTime = () => ytRef.current?.getCurrentTime() ?? null;
+
+  // iOS: 페이지 첫 터치/클릭에서 오디오를 미리 잠금 해제.
+  useEffect(() => {
+    unlockAudioOnFirstGesture();
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

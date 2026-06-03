@@ -36,6 +36,35 @@ export function ensureAudio(): AudioContext | null {
   return audioCtx;
 }
 
+/** AudioContext가 실제로 'running'이 될 때까지 기다린다(iOS 첫 재생 보강). */
+export async function resumeAudio(): Promise<void> {
+  const ctx = ensureAudio();
+  if (ctx && ctx.state !== 'running') {
+    try {
+      await ctx.resume();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/**
+ * 페이지에서 사용자가 처음 터치/클릭/키 입력하는 순간 오디오를 잠금 해제한다.
+ * iOS Safari는 사용자 제스처 안에서만 AudioContext를 깨울 수 있으므로,
+ * 재생 버튼을 누르기 전 어떤 상호작용(곡 선택, 메뉴 열기 등)에서든 미리 깨워둔다.
+ */
+let unlockInstalled = false;
+export function unlockAudioOnFirstGesture(): void {
+  if (unlockInstalled || typeof document === 'undefined') return;
+  unlockInstalled = true;
+  const events = ['pointerdown', 'touchend', 'mousedown', 'keydown'] as const;
+  const handler = () => {
+    ensureAudio();
+    events.forEach((ev) => document.removeEventListener(ev, handler, true));
+  };
+  events.forEach((ev) => document.addEventListener(ev, handler, true));
+}
+
 /** 지정한 AudioContext 시각에 클릭을 예약 재생 (정밀 메트로놈용). */
 export function playClickAt(when: number, accent: boolean): void {
   const ctx = audioCtx;

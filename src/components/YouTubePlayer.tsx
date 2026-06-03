@@ -3,19 +3,23 @@ import type { Ref } from 'react';
 import { useYouTubeStore } from '../stores/youtubeStore';
 import { useTransportStore } from '../stores/transportStore';
 import { extractVideoId } from '../lib/youtubeApi';
+import { ensureAudio } from '../lib/metronome';
 
 export interface YouTubeHandle {
   getCurrentTime: () => number | null;
   getDuration: () => number;
   seekTo: (sec: number) => void;
-  /**
-   * iOS 잠금 해제: 사용자 제스처 안에서 음소거로 잠깐 재생 후 즉시 정지.
-   * 이렇게 한 번 "사용자가 시작한 재생"으로 인정받으면, 이후 카운트인 뒤
-   * 프로그램이 호출하는 playVideo()도 소리가 정상적으로 난다.
-   * 첫 호출에만 동작하며, 잠금 해제가 끝나면 resolve.
-   */
-  prime: () => Promise<void>;
 }
+
+/**
+ * iPadOS/iOS 판별. iOS는 소리 있는 자동재생을 막지만 "음소거 재생"은 허용한다.
+ * 그래서 iOS에선 영상을 음소거로 시작해 재생은 항상 되게 하고, 사용자가
+ * 화면의 스피커 버튼을 직접 눌러(=제스처) 음소거를 해제하면 소리가 난다.
+ */
+const IS_IOS =
+  typeof navigator !== 'undefined' &&
+  (/iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 
 interface Props {
   ref?: Ref<YouTubeHandle>;
@@ -63,9 +67,13 @@ export function YouTubePlayer({ ref }: Props) {
 
   const playerRef = useRef<YT.Player | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const primedRef = useRef(false); // iOS 잠금 해제 완료 여부
-  const primingRef = useRef(false); // 잠금 해제 중 (상태변경 이벤트 무시용)
   const [inputUrl, setInputUrl] = useState(ytVideoId);
+  // iOS는 음소거로 시작(재생 보장). 그 외 기기는 처음부터 소리.
+  const [muted, setMuted] = useState(IS_IOS);
+  const mutedRef = useRef(muted);
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
 
   useImperativeHandle(
     ref,
@@ -73,38 +81,27 @@ export function YouTubePlayer({ ref }: Props) {
       getCurrentTime: () => playerRef.current?.getCurrentTime() ?? null,
       getDuration: () => playerRef.current?.getDuration() ?? 0,
       seekTo: (sec: number) => playerRef.current?.seekTo(sec, true),
-      prime: () =>
-        new Promise<void>((resolve) => {
-          const p = playerRef.current;
-          if (!p || !useYouTubeStore.getState().ytReady || primedRef.current) {
-            resolve();
-            return;
-          }
-          primedRef.current = true;
-          primingRef.current = true; // 이 동안의 PLAYING/PAUSED 이벤트는 무시
-          try {
-            p.mute();
-            p.playVideo();
-          } catch {
-            /* ignore */
-          }
-          window.setTimeout(() => {
-            try {
-              p.pauseVideo();
-              p.unMute();
-            } catch {
-              /* ignore */
-            }
-            // pauseVideo의 PAUSED 이벤트가 도착해 흡수될 시간을 두고 해제
-            window.setTimeout(() => {
-              primingRef.current = false;
-              resolve();
-            }, 150);
-          }, 60);
-        }),
     }),
     []
   );
+
+  const toggleMute = () => {
+    const p = playerRef.current;
+    if (!p) return;
+    ensureAudio(); // 이 탭(제스처)으로 Web Audio도 함께 잠금 해제
+    try {
+      if (mutedRef.current) {
+        p.unMute();
+        p.setVolume(100);
+        setMuted(false);
+      } else {
+        p.mute();
+        setMuted(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
 
   // 플레이어 생성/파괴 — 의도적으로 마운트당 1회 사이클.
   // videoId 변경은 별도 effect의 loadVideoById로 처리한다.
@@ -134,10 +131,16 @@ export function YouTubePlayer({ ref }: Props) {
             rel: 0,
           },
           events: {
-            onReady: () => setYtReady(true),
+            onReady: () => {
+              // iOS: 음소거로 시작해야 프로그램 호출 재생이 차단되지 않는다.
+              try {
+                if (mutedRef.current) createdPlayer?.mute();
+              } catch {
+                /* ignore */
+              }
+              setYtReady(true);
+            },
             onStateChange: (e) => {
-              // iOS 잠금 해제(prime) 중의 재생/정지 이벤트는 무시.
-              if (primingRef.current) return;
               // 악보 재생 모드에선 YouTube 상태로 transport를 건드리지 않는다.
               if (useTransportStore.getState().playbackSource !== 'youtube') return;
               const s = e.data;
@@ -180,6 +183,7 @@ export function YouTubePlayer({ ref }: Props) {
   useEffect(() => {
     if (!ytReady || !playerRef.current) return;
     playerRef.current.loadVideoById(ytVideoId);
+    if (mutedRef.current) playerRef.current.mute();
     playerRef.current.pauseVideo();
     setInputUrl(ytVideoId);
     // loadTrigger를 deps에 포함시켜 같은 ID 재호출도 다시 로드되게 한다.
@@ -221,6 +225,32 @@ export function YouTubePlayer({ ref }: Props) {
       </h2>
       <div className="relative aspect-video rounded-lg overflow-hidden bg-black mb-2.5">
         <div ref={containerRef} className="absolute inset-0" />
+        {/* 음소거 토글 — 영상 우측 상단 고정. iOS에선 처음 음소거로 시작하므로
+            여기를 눌러 소리를 켠다. */}
+        {ytReady && (
+          <button
+            onClick={toggleMute}
+            title={muted ? '소리 켜기' : '음소거'}
+            className="absolute top-2 right-2 z-10 flex items-center gap-1.5 rounded-full font-mono text-[12px] font-semibold shadow-lg transition-colors"
+            style={
+              muted
+                ? {
+                    background: 'var(--color-accent)',
+                    color: 'var(--color-paper)',
+                    padding: '6px 12px',
+                  }
+                : {
+                    background: 'rgba(26,22,18,0.6)',
+                    color: '#fff',
+                    padding: '6px 9px',
+                    backdropFilter: 'blur(4px)',
+                  }
+            }
+          >
+            <span className="text-[14px] leading-none">{muted ? '🔇' : '🔊'}</span>
+            {muted && <span>소리 켜기</span>}
+          </button>
+        )}
       </div>
       <div className="flex gap-1.5">
         <input
