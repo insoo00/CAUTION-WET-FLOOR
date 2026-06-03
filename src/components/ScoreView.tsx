@@ -49,10 +49,32 @@ export function ScoreView({ ref, onSeekTime, onLoaded }: Props) {
   const measureElsRef = useRef<Element[]>([]);
   const highlightedRef = useRef<Element[]>([]);
   const lastAutoScrollRef = useRef(0);
+  // 리사이즈 시 레이아웃만 다시 그리는 함수(스토어/재생 상태는 건드리지 않음)
+  const relayoutRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     autoScrollRef.current = autoScroll;
   }, [autoScroll]);
+
+  // 화면 폭 변경(PC 창 크기/기기 회전 등) 시 악보를 폭에 맞춰 다시 레이아웃.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let lastW = Math.round(el.getBoundingClientRect().width);
+    let debounce: ReturnType<typeof setTimeout> | undefined;
+    const ro = new ResizeObserver(() => {
+      const w = Math.round(el.getBoundingClientRect().width);
+      if (Math.abs(w - lastW) < 30) return; // 미세 변화 무시
+      lastW = w;
+      clearTimeout(debounce);
+      debounce = setTimeout(() => relayoutRef.current(), 250);
+    });
+    ro.observe(el);
+    return () => {
+      clearTimeout(debounce);
+      ro.disconnect();
+    };
+  }, []);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -142,16 +164,16 @@ export function ScoreView({ ref, onSeekTime, onLoaded }: Props) {
     }
   };
 
-  const renderAndAnalyze = async (
-    input: { xml: string } | { mxlBase64: string },
-    fallbackTitle: string
-  ) => {
-    const tk = await getVerovioToolkit();
+  // 레이아웃만: 이미 toolkit에 로드된 데이터를 화면 폭에 맞춰 SVG로 다시 그리고
+  // 마디 엘리먼트 캐시를 갱신한다. 스토어/재생 상태는 건드리지 않는다(리사이즈용).
+  const layoutToSvg = (tk: Awaited<ReturnType<typeof getVerovioToolkit>>) => {
     const container = containerRef.current;
     if (!container) return;
 
     const width = Math.round(container.getBoundingClientRect().width) || 800;
-    const TARGET_PER_LINE = 4;
+    // 화면 폭에 따라 한 줄 마디 수 조절 — 좁은 화면(폰)에서 음표가 잘리거나
+    // 과하게 작아지는 것 방지. iPad/PC는 4마디 유지.
+    const TARGET_PER_LINE = width < 480 ? 2 : width < 760 ? 3 : 4;
     let scale = 36;
     const setOpts = (s: number, pw: number) =>
       tk.setOptions({
@@ -168,16 +190,9 @@ export function ScoreView({ ref, onSeekTime, onLoaded }: Props) {
       });
 
     setOpts(scale, Math.round((width * 100) / scale));
-    const ok =
-      'xml' in input
-        ? tk.loadData(input.xml)
-        : tk.loadZipDataBase64(input.mxlBase64);
-    if (!ok) throw new Error('Verovio 악보 로드 실패');
-
     container.innerHTML = tk.renderToSVG(1);
 
-    // 첫 줄(시스템)에 정확히 4마디가 오도록 scale 보정.
-    // getBBox(y) 최상단 시스템의 마디 수를 세서 cnt/4 비율로 조정 (레이아웃 타이밍 무관).
+    // 첫 줄(시스템)에 TARGET_PER_LINE 마디가 오도록 scale 보정.
     const countFirstSystem = () => {
       const ms = Array.from(
         container.querySelectorAll('.measure')
@@ -204,7 +219,6 @@ export function ScoreView({ ref, onSeekTime, onLoaded }: Props) {
 
     // 내용이 화면 폭을 꽉 채우도록: 현재 내용이 차지하는 가로 비율을 재서
     // pageWidth를 그만큼 줄여 "재렌더" → svgViewBox가 화면 폭으로 확대.
-    // (viewBox 좌표를 직접 건드리지 않아 안전.)
     try {
       const svg = container.querySelector('svg');
       if (svg) {
@@ -226,6 +240,35 @@ export function ScoreView({ ref, onSeekTime, onLoaded }: Props) {
 
     // 마디 엘리먼트 캐시 (DOM 순서 = 악보 순서)
     measureElsRef.current = Array.from(container.querySelectorAll('.measure'));
+  };
+
+  // 리사이즈 시 호출 — 로드된 악보가 있으면 폭에 맞춰 레이아웃만 다시.
+  const relayout = () => {
+    const tk = getLoadedToolkit();
+    if (!tk || !useScoreStore.getState().isLoaded) return;
+    try {
+      layoutToSvg(tk);
+    } catch (e) {
+      console.warn('relayout failed', e);
+    }
+  };
+  relayoutRef.current = relayout;
+
+  const renderAndAnalyze = async (
+    input: { xml: string } | { mxlBase64: string },
+    fallbackTitle: string
+  ) => {
+    const tk = await getVerovioToolkit();
+    const container = containerRef.current;
+    if (!container) return;
+
+    const ok =
+      'xml' in input
+        ? tk.loadData(input.xml)
+        : tk.loadZipDataBase64(input.mxlBase64);
+    if (!ok) throw new Error('Verovio 악보 로드 실패');
+
+    layoutToSvg(tk);
     const totalMeasures = measureElsRef.current.length;
 
     // 마디 시작 시각(ms) — 첫 등장 기준
