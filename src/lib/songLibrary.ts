@@ -37,7 +37,7 @@ export const SONGS: SongDef[] = [
   {
     id: 'a-flying-butterfly',
     title: '나는 나비',
-    artist: '자우림',
+    artist: 'YB (윤도현 밴드)',
     mxlUrl: naneunNabiMxlUrl,
     youtubeId: 'Ik9hLZsHU7g',
     mapping: [

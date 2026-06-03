@@ -495,7 +495,7 @@ export function ScoreView({ ref, onSeekTime }: Props) {
                     )}
                   </span>
                   <span className="font-mono text-[11px] text-ink/35 group-hover:text-accent transition-colors">
-                    {song.youtubeId ? '▶ 동기' : '악보'}
+                    {song.youtubeId ? '▶ 재생' : '악보'}
                   </span>
                 </button>
               ))}

@@ -21,7 +21,7 @@ export function AppHeader() {
             Wet Floor
           </h1>
           <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink/55">
-            미끄럼주의 · 밴드 연습
+            미끄럼주의
           </span>
         </div>
       </div>
