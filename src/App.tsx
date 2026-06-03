@@ -40,12 +40,9 @@ export function App() {
   const { elapsedSec, totalSec, resetScorePosition, seekToTime } =
     useTransportLoop({ ytRef, scoreRef });
 
-  const requestPlay = async () => {
+  /** 악기 로딩 + 카운트인(타이머) 후 재생 시작. 위치는 호출 전에 세팅돼 있어야 함. */
+  const startWithCountIn = async () => {
     const t = useTransportStore.getState();
-    if (t.isPlaying) {
-      t.setIsPlaying(false);
-      return;
-    }
     const myToken = ++playToken.current;
     const cancelled = () => playToken.current !== myToken;
     ensureAudio();
@@ -68,6 +65,27 @@ export function App() {
     if (cancelled()) return;
     setOverlay(null);
     useTransportStore.getState().setIsPlaying(true);
+  };
+
+  const requestPlay = async () => {
+    const t = useTransportStore.getState();
+    if (t.isPlaying) {
+      t.setIsPlaying(false);
+      return;
+    }
+    await startWithCountIn();
+  };
+
+  /** 악보 음표 클릭 → 그 위치로 이동. 정지 상태면 카운트인 후 재생. */
+  const handleScoreSeek = async (sec: number) => {
+    if (useTransportStore.getState().isPlaying) {
+      // 이미 재생 중이면 그 위치로 즉시 점프
+      seekToTime(sec, true);
+      return;
+    }
+    // 정지 상태: 위치만 잡고(재생 X) → 카운트인 후 시작
+    seekToTime(sec, false);
+    await startWithCountIn();
   };
 
   const handleRewind = () => {
@@ -150,7 +168,7 @@ export function App() {
 
         {/* 악보 (항상 전체 폭) */}
         <div className="relative flex-1 min-w-0 pl-3">
-          <ScoreView ref={scoreRef} onSeekTime={seekToTime} onLoaded={handleRewind} />
+          <ScoreView ref={scoreRef} onSeekTime={handleScoreSeek} onLoaded={handleRewind} />
           {overlay && (
             <div className="pointer-events-none absolute inset-0 z-[8] flex items-center justify-center">
               <div
