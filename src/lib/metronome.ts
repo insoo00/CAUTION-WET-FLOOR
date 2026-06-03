@@ -24,9 +24,61 @@ export function setPlaybackAudioSession(): void {
   }
 }
 
+/**
+ * iOS 무음 스위치 우회 (구형 iOS 포함, audioSession 미지원 대비).
+ * 사용자 제스처에서 무음 HTML5 <audio>를 루프 재생하면 iOS가 페이지를
+ * "미디어 재생"으로 간주해 Web Audio(피아노/메트로놈) 소리를 스피커로 보낸다.
+ */
+let silentEl: HTMLAudioElement | null = null;
+function buildSilentWavUri(): string {
+  const sampleRate = 8000;
+  const numSamples = sampleRate * 0.5; // 0.5초 무음
+  const dataSize = numSamples * 2; // 16-bit mono
+  const buf = new ArrayBuffer(44 + dataSize);
+  const dv = new DataView(buf);
+  const ws = (off: number, s: string) => {
+    for (let i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i));
+  };
+  ws(0, 'RIFF');
+  dv.setUint32(4, 36 + dataSize, true);
+  ws(8, 'WAVE');
+  ws(12, 'fmt ');
+  dv.setUint32(16, 16, true);
+  dv.setUint16(20, 1, true); // PCM
+  dv.setUint16(22, 1, true); // mono
+  dv.setUint32(24, sampleRate, true);
+  dv.setUint32(28, sampleRate * 2, true);
+  dv.setUint16(32, 2, true);
+  dv.setUint16(34, 16, true);
+  ws(36, 'data');
+  dv.setUint32(40, dataSize, true);
+  // 샘플은 0(무음)으로 이미 채워져 있음
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return 'data:audio/wav;base64,' + btoa(bin);
+}
+export function playSilentUnlock(): void {
+  try {
+    if (typeof document === 'undefined') return;
+    if (!silentEl) {
+      silentEl = document.createElement('audio');
+      silentEl.setAttribute('playsinline', '');
+      silentEl.loop = true;
+      silentEl.preload = 'auto';
+      silentEl.src = buildSilentWavUri();
+    }
+    const p = silentEl.play();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch {
+    /* ignore */
+  }
+}
+
 export function ensureAudio(): AudioContext | null {
   if (typeof window === 'undefined') return null;
   setPlaybackAudioSession(); // 무음 스위치 무시하고 소리 나게 (iOS)
+  playSilentUnlock(); // 무음 미디어 재생으로 iOS 무음 스위치 우회
   if (!audioCtx) {
     const AudioCtor =
       window.AudioContext ||
