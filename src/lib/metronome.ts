@@ -9,8 +9,24 @@ export function getAudioContext(): AudioContext | null {
   return audioCtx;
 }
 
+/**
+ * iOS 핵심: Web Audio는 기본적으로 'ambient' 세션이라 무음 스위치에 의해
+ * 음소거된다. 'playback'으로 바꾸면 동영상처럼 무음 스위치를 무시하고 소리가 난다.
+ * (Safari 16.4+. 미지원 브라우저에선 무시됨.)
+ */
+export function setPlaybackAudioSession(): void {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.audioSession) {
+      navigator.audioSession.type = 'playback';
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 export function ensureAudio(): AudioContext | null {
   if (typeof window === 'undefined') return null;
+  setPlaybackAudioSession(); // 무음 스위치 무시하고 소리 나게 (iOS)
   if (!audioCtx) {
     const AudioCtor =
       window.AudioContext ||
@@ -57,6 +73,7 @@ let unlockInstalled = false;
 export function unlockAudioOnFirstGesture(): void {
   if (unlockInstalled || typeof document === 'undefined') return;
   unlockInstalled = true;
+  setPlaybackAudioSession(); // 제스처 전에도 미리 지정 시도
   const events = ['pointerdown', 'touchend', 'mousedown', 'keydown'] as const;
   const handler = () => {
     ensureAudio();
