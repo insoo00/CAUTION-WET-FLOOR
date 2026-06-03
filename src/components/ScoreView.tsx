@@ -171,71 +171,49 @@ export function ScoreView({ ref, onSeekTime, onLoaded }: Props) {
     if (!container) return;
 
     const width = Math.round(container.getBoundingClientRect().width) || 800;
-    // 화면 폭에 따라 한 줄 마디 수 조절 — 좁은 화면(폰)에서 음표가 잘리거나
-    // 과하게 작아지는 것 방지. iPad/PC는 4마디 유지.
-    const TARGET_PER_LINE = width < 480 ? 2 : width < 760 ? 3 : 4;
-    let scale = 36;
-    const setOpts = (s: number, pw: number) =>
+    // 기기 구분(뷰포트 기준)으로 한 줄 마디 수를 일관되게: 모바일 / 태블릿 / PC.
+    //   모바일(<768): 2마디 · 태블릿(<1280): 4마디 · PC(≥1280): 6마디
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const TARGET_PER_LINE = vw < 768 ? 2 : vw < 1280 ? 4 : 6;
+
+    const setOpts = (s: number) =>
       tk.setOptions({
         scale: s,
-        pageWidth: pw,
+        pageWidth: Math.round((width * 100) / s),
         pageHeight: 60000,
         adjustPageHeight: true,
         svgViewBox: true,
-        breaks: 'auto',
+        breaks: 'auto', // 인코딩된 원본 줄바꿈 무시, pageWidth로 자동 줄바꿈
         footer: 'none',
         header: 'none', // 제목/크레딧 끔 (소스 파일의 찌꺼기 '그_' 제거)
         spacingStaff: 12,
         spacingSystem: 16,
       });
 
-    setOpts(scale, Math.round((width * 100) / scale));
-    container.innerHTML = tk.renderToSVG(1);
-
-    // 첫 줄(시스템)에 TARGET_PER_LINE 마디가 오도록 scale 보정.
+    // 첫 줄(.system) 마디 수가 TARGET이 되도록 배율을 반복 보정.
+    // (배율↑ → pageWidth(단위)↓ → 한 줄 마디 수↓, 음표 커짐)
     const countFirstSystem = () => {
-      const ms = Array.from(
-        container.querySelectorAll('.measure')
-      ) as SVGGraphicsElement[];
-      if (ms.length === 0) return 0;
-      const ys = ms.map((m) => m.getBBox().y);
-      const y0 = Math.min(...ys);
-      return ys.filter((y) => Math.abs(y - y0) < 60).length;
+      const sys = container.querySelector('.system');
+      return sys ? sys.querySelectorAll('.measure').length : 0;
     };
+    let scale = 40;
+    setOpts(scale);
+    tk.redoLayout();
+    container.innerHTML = tk.renderToSVG(1);
     try {
       for (let iter = 0; iter < 6; iter++) {
         const cnt = countFirstSystem();
         if (cnt === 0 || cnt === TARGET_PER_LINE) break;
         let target = (scale * cnt) / TARGET_PER_LINE;
-        target = Math.max(14, Math.min(80, target));
-        if (Math.abs(target - scale) < 0.3) break;
+        target = Math.max(16, Math.min(130, target));
+        if (Math.abs(target - scale) < 0.4) break;
         scale = target;
-        setOpts(scale, Math.round((width * 100) / scale));
+        setOpts(scale);
+        tk.redoLayout();
         container.innerHTML = tk.renderToSVG(1);
       }
     } catch (e) {
       console.warn('measure-fit pass failed', e);
-    }
-
-    // 내용이 화면 폭을 꽉 채우도록: 현재 내용이 차지하는 가로 비율을 재서
-    // pageWidth를 그만큼 줄여 "재렌더" → svgViewBox가 화면 폭으로 확대.
-    try {
-      const svg = container.querySelector('svg');
-      if (svg) {
-        const sr = svg.getBoundingClientRect();
-        let maxRight = 0;
-        container.querySelectorAll('.measure').forEach((m) => {
-          maxRight = Math.max(maxRight, m.getBoundingClientRect().right);
-        });
-        const fillFrac = sr.width > 0 ? (maxRight - sr.left) / sr.width : 1;
-        if (fillFrac > 0.3 && fillFrac < 0.93) {
-          const newPW = Math.round(((width * 100) / scale) * (fillFrac + 0.02));
-          setOpts(scale, newPW);
-          container.innerHTML = tk.renderToSVG(1);
-        }
-      }
-    } catch (e) {
-      console.warn('width-fill re-render failed', e);
     }
 
     // 마디 엘리먼트 캐시 (DOM 순서 = 악보 순서)
@@ -486,7 +464,7 @@ export function ScoreView({ ref, onSeekTime, onLoaded }: Props) {
       <div
         ref={scrollRef}
         onClick={handleScoreClick}
-        className="flex-1 overflow-y-auto overflow-x-hidden scroll-paper px-6 py-5"
+        className="flex-1 overflow-y-auto overflow-x-hidden scroll-paper px-2 md:px-6 py-5"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div className="relative w-full">

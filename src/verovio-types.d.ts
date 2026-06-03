@@ -25,6 +25,7 @@ declare module 'verovio/esm' {
     getTimeForElement(id: string): number;
     getPageCount(): number;
     setOptions(options: Record<string, unknown>): void;
+    redoLayout(options?: Record<string, unknown>): void;
     getElementAttr(id: string): Record<string, unknown>;
   }
 }

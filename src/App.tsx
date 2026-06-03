@@ -149,16 +149,16 @@ export function App() {
   }, []);
 
   return (
-    <div className="h-dvh grid grid-rows-[auto_1fr_auto] grid-cols-1 overflow-x-hidden">
+    <div className="h-dvh grid grid-rows-[auto_1fr_auto] grid-cols-1 overflow-hidden">
       <AppHeader />
 
-      <main className="relative flex px-3 py-3 overflow-hidden">
+      <main className="relative flex px-1 md:px-3 py-3 overflow-hidden">
         {/* 왼쪽 아이콘 레일 (항상 표시) */}
-        <nav className="shrink-0 w-14 flex flex-col items-center gap-1.5 py-1 z-30">
+        <nav className="shrink-0 w-10 md:w-14 flex flex-col items-center gap-1.5 py-1 z-30">
           <button
             onClick={() => setPanelOpen((v) => !v)}
             title={panelOpen ? '메뉴 닫기' : '메뉴 열기'}
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-[18px] transition-colors"
+            className="w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center text-[18px] transition-colors"
             style={{
               background: panelOpen ? 'var(--color-ink)' : 'transparent',
               color: panelOpen ? 'var(--color-paper)' : 'var(--color-ink)',
@@ -172,7 +172,7 @@ export function App() {
               key={s.id}
               onClick={() => openSection(s.id)}
               title={s.label}
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-[17px] hover:bg-ink/8 transition-colors"
+              className="w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center text-[17px] hover:bg-ink/8 transition-colors"
             >
               {s.icon}
             </button>
@@ -180,7 +180,7 @@ export function App() {
         </nav>
 
         {/* 악보 (항상 전체 폭) */}
-        <div className="relative flex-1 min-w-0 pl-3">
+        <div className="relative flex-1 min-w-0 pl-1 md:pl-3">
           <ScoreView ref={scoreRef} onSeekTime={handleScoreSeek} onLoaded={handleRewind} />
           {overlay && (
             <div className="pointer-events-none absolute inset-0 z-[8] flex items-center justify-center">
