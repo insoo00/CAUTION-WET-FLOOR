@@ -100,6 +100,9 @@ export function useTransportLoop({ ytRef, scoreRef }: Params) {
   const prevBeatRef = useRef(-1);
   const prevGlobalBeatRef = useRef(-1);
   const scoreResumeSecRef = useRef(0);
+  // 재생 정지 시 "정지 시점 위치"를 이어듣기용으로 저장할지 여부.
+  // 되감기/새 곡 로드(resetScorePosition)는 false로 만들어 0을 덮어쓰지 않게 한다.
+  const captureResumeRef = useRef(true);
 
   const buildScoreOpts = useCallback(
     () => ({
@@ -128,6 +131,10 @@ export function useTransportLoop({ ytRef, scoreRef }: Params) {
     let cancelled = false;
     let raf = 0;
     let lastClock = 0;
+
+    // 이번 재생 세션이 정지되면 정지 시점 위치를 저장(이어듣기)한다.
+    // (되감기 등으로 미리 false가 됐더라도, 실제 재생이 시작되면 다시 켠다.)
+    captureResumeRef.current = true;
 
     let fromSec = scoreResumeSecRef.current;
     if (fromSec >= score.durationSec - 1e-3) fromSec = 0;
@@ -182,7 +189,8 @@ export function useTransportLoop({ ytRef, scoreRef }: Params) {
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
-      scoreResumeSecRef.current = getPositionSec();
+      // 일반 일시정지일 때만 위치 저장. 되감기/새 곡 로드면 0을 유지.
+      if (captureResumeRef.current) scoreResumeSecRef.current = getPositionSec();
       stopScorePlayback();
     };
   }, [isPlaying, playbackSource, scoreRef, buildScoreOpts]);
@@ -291,6 +299,8 @@ export function useTransportLoop({ ytRef, scoreRef }: Params) {
 
   const resetScorePosition = useCallback(() => {
     scoreResumeSecRef.current = 0;
+    // 직후 재생 effect cleanup이 현재 위치로 덮어쓰지 못하게 막는다.
+    captureResumeRef.current = false;
   }, []);
 
   /** 악보 클릭 → 그 시각(초)부터 이동/재생 */

@@ -150,7 +150,7 @@ export function App() {
 
         {/* 악보 (항상 전체 폭) */}
         <div className="relative flex-1 min-w-0 pl-3">
-          <ScoreView ref={scoreRef} onSeekTime={seekToTime} />
+          <ScoreView ref={scoreRef} onSeekTime={seekToTime} onLoaded={handleRewind} />
           {overlay && (
             <div className="pointer-events-none absolute inset-0 z-[8] flex items-center justify-center">
               <div

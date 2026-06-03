@@ -30,9 +30,11 @@ interface Props {
   ref?: Ref<ScoreViewHandle>;
   /** 악보 클릭 시 그 위치(초)부터 이동/재생 */
   onSeekTime?: (sec: number) => void;
+  /** 새 악보 로드 완료 시 호출 — 재생 위치를 맨 앞으로 초기화하는 용도 */
+  onLoaded?: () => void;
 }
 
-export function ScoreView({ ref, onSeekTime }: Props) {
+export function ScoreView({ ref, onSeekTime, onLoaded }: Props) {
   const isLoaded = useScoreStore((s) => s.isLoaded);
   const songTitle = useScoreStore((s) => s.songTitle);
   const setScoreData = useScoreStore((s) => s.setScoreData);
@@ -322,6 +324,8 @@ export function ScoreView({ ref, onSeekTime }: Props) {
       setError(null);
       useTransportStore.getState().setIsPlaying(false);
       await renderAndAnalyze(input, fallbackTitle);
+      // 새 악보를 열면 재생 위치를 맨 앞으로 초기화 → 첫 재생은 항상 1마디부터.
+      onLoaded?.();
     } catch (e) {
       console.error(e);
       setError('악보 로드 실패');
