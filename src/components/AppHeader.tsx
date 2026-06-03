@@ -8,8 +8,8 @@ export function AppHeader() {
   const isPreciseSync = useMappingStore((s) => s.measureMap.length >= 2);
 
   return (
-    <header className="flex items-center justify-between px-5 py-3 border-b border-ink/12 backdrop-blur-md bg-gradient-to-b from-paper/95 to-paper/70">
-      <div className="flex items-center gap-2.5">
+    <header className="flex items-center justify-between gap-3 min-w-0 px-4 md:px-5 py-3 border-b border-ink/12 backdrop-blur-md bg-gradient-to-b from-paper/95 to-paper/70">
+      <div className="flex items-center gap-2.5 min-w-0">
         <span
           className="font-mono text-[10px] font-semibold tracking-[0.12em] uppercase px-2 py-1 rounded-md leading-none"
           style={{ background: 'var(--color-accent)', color: 'var(--color-paper)' }}
@@ -20,12 +20,12 @@ export function AppHeader() {
           <h1 className="font-display italic font-extrabold text-2xl tracking-tight">
             Wet Floor
           </h1>
-          <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink/55">
+          <span className="font-mono text-[10px] tracking-[0.18em] uppercase text-ink/55 whitespace-nowrap">
             미끄럼주의
           </span>
         </div>
       </div>
-      <div className="flex items-center gap-3.5 font-mono text-[11px] text-ink/65">
+      <div className="hidden md:flex items-center gap-3.5 font-mono text-[11px] text-ink/65 shrink-0">
         <span className="pill">
           <strong className="text-ink font-semibold">{timeSignature}</strong> · time
         </span>

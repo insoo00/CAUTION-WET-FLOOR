@@ -53,7 +53,7 @@ export function TransportControls({
     formatTime(elapsedSec) + (totalSec ? ` / ${formatTime(totalSec)}` : '');
 
   return (
-    <footer className="flex items-center gap-4 px-5 py-3 border-t border-ink/12 backdrop-blur-md bg-gradient-to-b from-paper/70 to-paper/95">
+    <footer className="flex items-center gap-2.5 md:gap-4 px-3 md:px-5 py-3 border-t border-ink/12 backdrop-blur-md bg-gradient-to-b from-paper/70 to-paper/95">
       <button
         onClick={onPlayToggle}
         aria-label={isPlaying ? '일시정지' : '재생'}
@@ -83,7 +83,7 @@ export function TransportControls({
         </div>
       </div>
 
-      <div className="flex gap-1.5">
+      <div className="flex gap-1 md:gap-1.5 shrink-0">
         <button onClick={onRewind} className="icon-btn" title="처음으로">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
             <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
@@ -118,7 +118,7 @@ export function TransportControls({
         </button>
         <button
           onClick={handleExport}
-          className="icon-btn"
+          className="icon-btn hidden md:flex"
           title="매핑 내보내기"
           disabled={measureMap.length === 0}
         >

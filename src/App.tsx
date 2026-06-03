@@ -149,7 +149,7 @@ export function App() {
   }, []);
 
   return (
-    <div className="h-dvh grid grid-rows-[auto_1fr_auto]">
+    <div className="h-dvh grid grid-rows-[auto_1fr_auto] grid-cols-1 overflow-x-hidden">
       <AppHeader />
 
       <main className="relative flex px-3 py-3 overflow-hidden">

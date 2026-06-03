@@ -439,12 +439,14 @@ export function ScoreView({ ref, onSeekTime, onLoaded }: Props) {
         }}
       />
 
-      <div className="flex justify-between items-center px-4 py-2.5 border-b border-dashed border-ink/15 font-mono text-[11px] tracking-[0.15em] uppercase text-ink/55">
-        <div className="flex gap-2 items-center">
-          <span className="w-2 h-2 rounded-full bg-accent shadow-[0_0_0_3px_rgba(212,69,42,0.18)]" />
+      <div className="flex justify-between items-center gap-2 min-w-0 px-3 md:px-4 py-2.5 border-b border-dashed border-ink/15 font-mono text-[11px] tracking-[0.08em] md:tracking-[0.15em] uppercase text-ink/55">
+        <div className="flex gap-2 items-center min-w-0 truncate">
+          <span className="w-2 h-2 rounded-full bg-accent shadow-[0_0_0_3px_rgba(212,69,42,0.18)] shrink-0" />
           <CurrentMeasureLabel />
         </div>
-        <AutoScrollLabel />
+        <div className="hidden sm:block shrink-0">
+          <AutoScrollLabel />
+        </div>
       </div>
 
       {isLoaded && (
